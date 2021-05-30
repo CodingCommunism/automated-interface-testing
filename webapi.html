@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style type="text/css">
+        body {
+            height: 1800px;
+        }
+
+        .scroll-container {
+            max-height: 500px;
+            background: pink;
+            overflow: auto;
+        }
+
+        .scroll-content {
+            height: 800px;
+
+        }
+
+        .scroll-inner {
+            width: 300px;
+            height: 300px;
+            background-color: purple;
+        }
+
+        .btn {
+            margin-top: 1000px;
+        }
+    </style>
+</head>
+
+<body>
+    <!-用于测试多种类型的点击事件可否派发-->
+    <label><input name="Fruit" type="radio" value="" class="aaa" />苹果 </label>
+    <label><input name="Fruit" type="radio" value="" class="bbb" />桃子 </label>
+    <label><input name="Fruit" type="radio" value="" />香蕉 </label>
+    <label><input name="Fruit" type="radio" value="" />梨 </label>
+    <label><input name="Fruit" type="radio" value="" />其它 </label>
+    <!-用于测试keydown事件-->
+    <input class ="inputTest" />
+    <button class="btn">
+        nihao
+    </button>
+    <div class="scroll-container">
+        <div class="scroll-content">
+            <div class="scroll-inner">
+                内部滚动测试
+            </div>
+        </div>
+    </div>
+    <script>
+        /*
+        * 第一步：完成点击事件，滚动事件，键盘输入事件的记录和重现。
+        * TODO:待办：拖拽事件？
+        */
+        const clickEvent = new MouseEvent('click');
+        const focusEvent = new FocusEvent('focus',{
+            view: window
+        });
+
+        // 通用节流方法
+        const throttle = function (cb, delay = 100) {
+            let timer = null;
+            return (ev) => {
+                if (timer) {
+                    clearTimeout(timer)
+                }
+                timer = setTimeout(() => {
+                    cb && cb(ev);
+                }, delay)
+            };
+        }
+        //TODO: 所有点击事件，滚动事件，键盘输入事件都需要记录时间点，相对最开始时间偏移，以正确重现
+        // 测试点击事件
+        document.onclick = function (ev) {
+            const x = ev.clientX;
+            const y = ev.clientY;
+            setTimeout(() => {
+                document.elementFromPoint(x, y).dispatchEvent(clickEvent);
+            }, 2000)
+        }
+        document.getElementsByClassName('btn')[0].onclick = function () {
+            console.log(11, 1)
+        }
+
+        // TODO:(待验证)测试重现滚动事件
+        let mouseX = 0;
+        let mouseY = 0;
+        let scrollStartEl = null; //用于记录滚动的起始元素，为了保证重现操作时为元素设置scrollTop时不出现偏差
+        let scrollRecordList = [];
+        let scrollElementSet = new Set();
+        setScrollWatcher = function (ev) {
+            mouseX = ev && ev.clientX || mouseX;
+            mouseY = ev && ev.clientY || mouseY;
+            scrollStartEl = document.elementFromPoint(mouseX, mouseY);
+            let el = scrollStartEl;
+            while (el) {
+                if (scrollElementSet.has(el)) {
+                    el = null;
+                } else {
+                    el.onscroll = throttle(recordScrollInfo);
+                    scrollElementSet.add(el);
+                    el = el.parentNode;
+                }
+            }
+        };
+        recordScrollInfo = function (ev) {
+            let el = scrollStartEl;
+            // 单纯的滚动也可能引起鼠标对应的dom的变化，滚动结束也需要setScrollWatcher
+            setScrollWatcher();
+            let scrollRecordInfo = {
+                mouseX: mouseX,
+                mouseY: mouseY,
+                scrollTopList: []
+            }
+            while (el) {
+                scrollRecordInfo.scrollTopList.push(el.scrollTop);
+                el = el.parentNode;
+            }
+            scrollRecordList.push(scrollRecordInfo);
+            console.log(scrollRecordList)
+        }
+        // 绑定鼠标移动事件
+        document.onmousemove = throttle(setScrollWatcher);
+
+        // 测试键盘输入事件
+        // 做法：假定，持续的键盘输入都是对同一个 input的输入，
+        // 那我需要做的就是保存输入顺序，并记录上一刻点击的元素，并改变其value！！判断是不是input(有没有value属性来判断)，如果不是用innerHtml/innerText去塞！！！为了支持富文本
+        document.onkeydown = function (ev) {
+            console.log(ev)
+        }
+        const keyTestEl = document.getElementsByClassName('inputTest')[0];
+        keyTestEl.dispatchEvent(clickEvent)
+        console.log(keyTestEl, focusEvent)
+        keyTestEl.dispatchEvent(focusEvent)
+        // const keyEvent = new KeyboardEvent('keypress',{'key':'a'})
+        //keyTestEl.dispatchEvent(keyEvent)
+        //keyTestEl.value = '11111'
+
+        // 测试radio的点击事件是否可以派发
+        document.getElementsByClassName('bbb')[0].dispatchEvent(clickEvent)
+        document.getElementsByClassName('aaa')[0].dispatchEvent(focusEvent)
+    </script>
+</body>
+
+</html>
